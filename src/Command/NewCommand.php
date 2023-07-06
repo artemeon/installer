@@ -26,7 +26,8 @@ class NewCommand extends Command
         $this->setName('new')
             ->setDescription('Create a new AGP project')
             ->addArgument('name', InputArgument::OPTIONAL)
-            ->addOption('branch', 'b', InputOption::VALUE_REQUIRED, '', null);
+            ->addOption('branch', 'b', InputOption::VALUE_REQUIRED, 'The branch to checkout.', null)
+            ->addOption('project', 'p', InputOption::VALUE_REQUIRED, 'Which project to checkout.', null);
     }
 
     protected function handle(): int
@@ -50,22 +51,43 @@ class NewCommand extends Command
 
         $this->output->writeln('');
 
-        $this->info(sprintf('Creating directory "%s" ...', $directory));
-        if (!mkdir($absoluteDirectory) && !is_dir($directory)) {
-            throw new RuntimeException(sprintf('Directory "%s" was not created', $directory));
-        }
-        $this->success(sprintf('Directory "%s" created.', $directory));
+        $project = $this->option('project');
+        $isProject = false;
+        if ($project) {
+            $directoryExistsBefore = is_dir($absoluteDirectory);
+            $this->info(sprintf('Cloning %s into %s ...', $project, $directory));
+            $cloneProject = new Process(['git', 'clone', '--recurse-submodules', 'https://github.com/artemeon/' . $project . '.git', $directory], timeout: 3600);
+            $cloneProject->run();
+            $isProject = $cloneProject->isSuccessful();
+            if (!$isProject && !$directoryExistsBefore && is_dir($absoluteDirectory)) {
+                rmdir($absoluteDirectory);
+            }
+            if (!$isProject) {
+                $this->error(sprintf('Project "%s" not found.', $project));
 
-        $this->info(sprintf('Cloning repository into "%s" ...', $coreDirectory));
-        $cloneProcess = new Process(['git', 'clone', 'https://github.com/artemeon/core-ng.git', 'core'], $directory, timeout: 3600);
-        $cloneProcess->run();
-        if (!$cloneProcess->isSuccessful()) {
-            $this->error('An error occurred while cloning the repository.');
-            $this->output->write($cloneProcess->getErrorOutput());
-
-            return self::FAILURE;
+                return self::FAILURE;
+            }
+            $this->success(sprintf('Cloned %s into %s.', $project, $directory));
         }
-        $this->success(sprintf('Repository cloned into "%s".', $coreDirectory));
+
+        if (!$isProject) {
+            $this->info(sprintf('Creating directory "%s" ...', $directory));
+            if (!mkdir($absoluteDirectory) && !is_dir($directory)) {
+                throw new RuntimeException(sprintf('Directory "%s" was not created', $directory));
+            }
+            $this->success(sprintf('Directory "%s" created.', $directory));
+
+            $this->info(sprintf('Cloning repository into "%s" ...', $coreDirectory));
+            $cloneProcess = new Process(['git', 'clone', 'https://github.com/artemeon/core-ng.git', 'core'], $directory, timeout: 3600);
+            $cloneProcess->run();
+            if (!$cloneProcess->isSuccessful()) {
+                $this->error('An error occurred while cloning the repository.');
+                $this->output->write($cloneProcess->getErrorOutput());
+
+                return self::FAILURE;
+            }
+            $this->success(sprintf('Repository cloned into "%s".', $coreDirectory));
+        }
 
         $branch = $this->option('branch');
         if ($branch) {
@@ -85,7 +107,7 @@ class NewCommand extends Command
             $this->success(sprintf('Branch switched to %s.', $branch));
         }
 
-        if (is_file($absoluteCoreDirectory . DIRECTORY_SEPARATOR . 'setupproject.php')) {
+        if (!$isProject && is_file($absoluteCoreDirectory . DIRECTORY_SEPARATOR . 'setupproject.php')) {
             $this->info('Setting up project ...');
             $setupProcess = new Process(['php', '-f', 'setupproject.php', 'skip-frontend-build'], $coreDirectory);
             $setupProcess->run();
@@ -125,7 +147,11 @@ class NewCommand extends Command
         if ($envExampleExists && !$envExists) {
             $this->title('Final steps');
 
-            $webRoot = $this->ask('Web root', $defaultWebRoot);
+            if ($valetAvailable) {
+                $webRoot = $defaultWebRoot;
+            } else {
+                $webRoot = $this->ask('Web root', $defaultWebRoot);
+            }
             $dbHost = $this->ask('Database Host', '127.0.0.1');
             $dbUsername = $this->ask('Database Username', 'root');
             $dbPassword = $this->ask('Database Password', '', true);
