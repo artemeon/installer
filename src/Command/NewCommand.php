@@ -39,6 +39,7 @@ class NewCommand extends Command
         $coreDirectory = $this->coreDirectory = $directory . DIRECTORY_SEPARATOR . 'core';
         $absoluteDirectory = $this->absoluteDirectory = getcwd() . DIRECTORY_SEPARATOR . $directory;
         $absoluteCoreDirectory = $this->absoluteCoreDirectory = getcwd() . DIRECTORY_SEPARATOR . $coreDirectory;
+        $branch = $this->option('branch');
 
         if (is_dir($absoluteDirectory)) {
             $this->error(sprintf('Directory "%s" already exists.', $directory));
@@ -55,15 +56,17 @@ class NewCommand extends Command
         $isProject = false;
         if ($project) {
             $directoryExistsBefore = is_dir($absoluteDirectory);
-            $this->info(sprintf('Cloning %s into %s ...', $project, $directory));
-            $cloneProject = new Process(['git', 'clone', '--recurse-submodules', 'https://github.com/artemeon/' . $project . '.git', $directory], timeout: 3600);
+            $this->info(sprintf('Cloning "%s" into "%s" ...', $project, $directory));
+            $parts = array_values(array_filter(['git', 'clone', $branch ? '-b' : null, $branch ?: null, '--recurse-submodules', 'https://github.com/artemeon/' . $project . '.git', $directory]));
+            $cloneProject = new Process($parts, timeout: 3600);
             $cloneProject->run();
             $isProject = $cloneProject->isSuccessful();
             if (!$isProject && !$directoryExistsBefore && is_dir($absoluteDirectory)) {
                 rmdir($absoluteDirectory);
             }
             if (!$isProject) {
-                $this->error(sprintf('Project "%s" not found.', $project));
+                $this->error(sprintf('An error occurred while cloning "%s".', $project));
+                $this->output->write($cloneProject->getErrorOutput());
 
                 return self::FAILURE;
             }
@@ -78,7 +81,8 @@ class NewCommand extends Command
             $this->success(sprintf('Directory "%s" created.', $directory));
 
             $this->info(sprintf('Cloning repository into "%s" ...', $coreDirectory));
-            $cloneProcess = new Process(['git', 'clone', 'https://github.com/artemeon/core-ng.git', 'core'], $directory, timeout: 3600);
+            $parts = array_values(array_filter(['git', 'clone', $branch ? '-b' : null, $branch ?: null, 'https://github.com/artemeon/core-ng.git', 'core']));
+            $cloneProcess = new Process($parts, $directory, timeout: 3600);
             $cloneProcess->run();
             if (!$cloneProcess->isSuccessful()) {
                 $this->error('An error occurred while cloning the repository.');
@@ -87,24 +91,6 @@ class NewCommand extends Command
                 return self::FAILURE;
             }
             $this->success(sprintf('Repository cloned into "%s".', $coreDirectory));
-        }
-
-        $branch = $this->option('branch');
-        if ($branch) {
-            $currentBranchProcess = new Process(['git', 'branch', '--show-current'], $coreDirectory);
-            $currentBranchProcess->run();
-            $currentBranch = $currentBranchProcess->getOutput();
-
-            $this->info(sprintf('Switching branch from %s to %s ...', $currentBranch, $branch));
-            $branchProcess = new Process(['git', 'checkout', $branch], $coreDirectory);
-            $branchProcess->run();
-            if (!$branchProcess->isSuccessful()) {
-                $this->error('An error occurred while switching the branch.');
-                $this->output->write($branchProcess->getErrorOutput());
-
-                return self::FAILURE;
-            }
-            $this->success(sprintf('Branch switched to %s.', $branch));
         }
 
         if (!$isProject && is_file($absoluteCoreDirectory . DIRECTORY_SEPARATOR . 'setupproject.php')) {
@@ -122,6 +108,10 @@ class NewCommand extends Command
             $this->buildFrontend();
         }
 
+        if ($isProject) {
+            $this->buildFrontend();
+        }
+
         $valetAvailable = false;
 
         try {
@@ -131,6 +121,19 @@ class NewCommand extends Command
             }
         } catch (Throwable $e) {
             $this->error($e->getMessage());
+        }
+
+        $composerInstalled = false;
+        if ($isProject) {
+            $composerInstall = new Process(['composer', 'install'], $directory . DIRECTORY_SEPARATOR . 'project');
+            $composerInstall->run();
+            $composerInstalled = $composerInstall->isSuccessful();
+            if (!$composerInstalled) {
+                $this->error('An error occurred while installing Composer dependencies.');
+                $this->output->write($composerInstall->getErrorOutput());
+            } else {
+                $this->success('Composer dependencies installed.');
+            }
         }
 
         $envExampleExists = is_file($absoluteDirectory . DIRECTORY_SEPARATOR . '.env.example');
@@ -173,16 +176,19 @@ class NewCommand extends Command
 
             $this->success(sprintf('"%s" updated.', $envFile));
 
-            $this->info(sprintf('Installing AGP into database "%s" ...', $dbName));
-            $this->output->writeln('This may take a while.');
+            if (!$isProject || $composerInstalled) {
+                $this->info(sprintf('Installing AGP into database "%s" ...', $dbName));
+                $this->output->writeln('          This may take a while.');
+                $this->output->writeln('');
 
-            $installAgp = Process::fromShellCommandline('php console.php install', $directory, timeout: 3600);
-            $installAgp->run();
-            if (!$installAgp->isSuccessful()) {
-                $this->error('An error occurred while installing the AGP.');
-                $this->output->write($installAgp->getErrorOutput());
-            } else {
-                $this->success(sprintf('AGP installed into database "%s".', $dbName));
+                $installAgp = Process::fromShellCommandline('php console.php install', $directory, timeout: 3600);
+                $installAgp->run();
+                if (!$installAgp->isSuccessful()) {
+                    $this->error('An error occurred while installing the AGP.');
+                    $this->output->write($installAgp->getErrorOutput());
+                } else {
+                    $this->success(sprintf('AGP installed into database "%s".', $dbName));
+                }
             }
         }
 
@@ -236,24 +242,13 @@ class NewCommand extends Command
 
         $this->info('Setting up Laravel Valet site ...');
 
-        $linkProcess = new Process(['valet', 'link'], $this->directory);
+        $linkProcess = new Process(['valet', 'link', '--secure'], $this->directory);
         $linkProcess->run();
 
         if ($linkProcess->isSuccessful()) {
             $this->success($linkProcess->getOutput());
         } else {
             $this->error($linkProcess->getErrorOutput());
-        }
-
-        $this->info('Securing site ...');
-
-        $secureProcess = new Process(['valet', 'secure'], $this->directory);
-        $secureProcess->run();
-
-        if ($secureProcess->isSuccessful()) {
-            $this->success($secureProcess->getOutput());
-        } else {
-            $this->error($secureProcess->getErrorOutput());
         }
 
         $composerJsonPath = $this->absoluteCoreDirectory . DIRECTORY_SEPARATOR . 'composer.json';
@@ -263,8 +258,8 @@ class NewCommand extends Command
         $composerJsonContent = file_get_contents($composerJsonPath);
         $composerJson = json_decode($composerJsonContent, false, 512, JSON_THROW_ON_ERROR);
         $phpVersion = (string) $composerJson->config?->platform?->php;
-        $parts = explode('.', $phpVersion, 2);
-        $minifiedPhpVersion = implode('.', $parts);
+        $parts = explode('.', $phpVersion);
+        $minifiedPhpVersion = implode('.', array_slice($parts, 0, 2));
         $prefixedPhpVersion = 'php@' . $minifiedPhpVersion;
 
         $this->info(sprintf('Isolating site to use PHP version %s.', $minifiedPhpVersion));
