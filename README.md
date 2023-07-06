@@ -11,3 +11,9 @@
         <img alt="Packagist Downloads" src="https://img.shields.io/github/license/artemeon/installer">
     </a>
 </p>
+
+## 🚀 Installation
+
+```
+composer global require artemeon/installer
+```
