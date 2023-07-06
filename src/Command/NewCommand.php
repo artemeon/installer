@@ -176,7 +176,7 @@ class NewCommand extends Command
 
             $this->success(sprintf('"%s" updated.', $envFile));
 
-            if (!$isProject || $composerInstalled) {
+            if (!$isProject) {
                 $this->info(sprintf('Installing AGP into database "%s" ...', $dbName));
                 $this->output->writeln('          This may take a while.');
                 $this->output->writeln('');
