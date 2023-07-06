@@ -2,14 +2,13 @@
 
 declare(strict_types=1);
 
-namespace Artemeon\Installer\Command;
+namespace Artemeon\Installer;
 
 use JsonException;
 use RuntimeException;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Process\Process;
-
 use Throwable;
 
 use function Termwind\terminal;
@@ -25,7 +24,7 @@ class NewCommand extends Command
     {
         $this->setName('new')
             ->setDescription('Create a new AGP project')
-            ->addArgument('name', InputArgument::OPTIONAL)
+            ->addArgument('name', InputArgument::REQUIRED)
             ->addOption('branch', 'b', InputOption::VALUE_REQUIRED, 'The branch to checkout.', null)
             ->addOption('project', 'p', InputOption::VALUE_REQUIRED, 'Which project to checkout.', null);
     }
@@ -123,7 +122,6 @@ class NewCommand extends Command
             $this->error($e->getMessage());
         }
 
-        $composerInstalled = false;
         if ($isProject) {
             $composerInstall = new Process(['composer', 'install'], $directory . DIRECTORY_SEPARATOR . 'project');
             $composerInstall->run();

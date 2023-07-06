@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Artemeon\Installer\Command;
+namespace Artemeon\Installer;
 
 use Exception;
 use Symfony\Component\Console\Helper\QuestionHelper;
