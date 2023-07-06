@@ -57,7 +57,7 @@ class NewCommand extends Command
         $this->success(sprintf('Directory "%s" created.', $directory));
 
         $this->info(sprintf('Cloning repository into "%s" ...', $coreDirectory));
-        $cloneProcess = new Process(['git', 'clone', 'https://github.com/artemeon/core-ng.git', 'core'], $directory);
+        $cloneProcess = new Process(['git', 'clone', 'https://github.com/artemeon/core-ng.git', 'core'], $directory, timeout: 3600);
         $cloneProcess->run();
         if (!$cloneProcess->isSuccessful()) {
             $this->error('An error occurred while cloning the repository.');
