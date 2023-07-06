@@ -114,22 +114,22 @@ class NewCommand extends Command
         $envExampleExists = is_file($absoluteDirectory . DIRECTORY_SEPARATOR . '.env.example');
         $envExists = is_file($absoluteDirectory . DIRECTORY_SEPARATOR . '.env');
 
-        $defaultWebRoot = 'https://dev.artemeon.de/' . $directory . '/';
+        $defaultWebRoot = 'dev.artemeon.de/' . $directory;
         if ($valetAvailable) {
             $getValetTld = new Process(['valet', 'tld']);
             $getValetTld->run();
             $valetTld = $getValetTld->getOutput();
-            $defaultWebRoot = 'https://' . $directory . '.' . trim($valetTld) . '/';
+            $defaultWebRoot = $directory . '.' . trim($valetTld);
         }
 
         if ($envExampleExists && !$envExists) {
             $this->title('Final steps');
 
             $webRoot = $this->ask('Web root', $defaultWebRoot);
-            $dbHost = $this->ask(' Database Host', '127.0.0.1');
-            $dbUsername = $this->ask(' Database Username', 'root');
-            $dbPassword = $this->ask(' Database Password', '');
-            $dbName = $this->ask(' Database Name', $directory);
+            $dbHost = $this->ask('Database Host', '127.0.0.1');
+            $dbUsername = $this->ask('Database Username', 'root');
+            $dbPassword = $this->ask('Database Password', '', true);
+            $dbName = $this->ask('Database Name', $directory);
 
             $this->output->writeln('');
 
@@ -146,6 +146,18 @@ class NewCommand extends Command
             file_put_contents($absoluteDirectory . DIRECTORY_SEPARATOR . '.env', $envFileContent);
 
             $this->success(sprintf('"%s" updated.', $envFile));
+
+            $this->info(sprintf('Installing AGP into database "%s" ...', $dbName));
+            $this->output->writeln('This may take a while.');
+
+            $installAgp = Process::fromShellCommandline('php console.php install', $directory, timeout: 3600);
+            $installAgp->run();
+            if (!$installAgp->isSuccessful()) {
+                $this->error('An error occurred while installing the AGP.');
+                $this->output->write($installAgp->getErrorOutput());
+            } else {
+                $this->success(sprintf('AGP installed into database "%s".', $dbName));
+            }
         }
 
         $this->title('Summary');
