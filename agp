@@ -1,0 +1,56 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+use Artemeon\Installer\Command\NewCommand;
+use Symfony\Component\Console\Application;
+
+(new class() {
+    private string $name;
+
+    public function main(): void
+    {
+        $this->autoload();
+        $this->fetchVersion();
+
+        $app = new Application($this->name);
+        $app->add(new NewCommand());
+        $app->run();
+    }
+
+    private function autoload(): void
+    {
+        if (isset($GLOBALS['_composer_autoload_path'])) {
+            define('COMPOSER_INSTALL_PATH', $GLOBALS['_composer_autoload_path']);
+
+            unset($GLOBALS['_composer_autoload_path']);
+        } else {
+            foreach (
+                [
+                    __DIR__ . '/../../autoload.php',
+                    __DIR__ . '/../vendor/autoload.php',
+                    __DIR__ . '/vendor/autoload.php'
+                ] as $file
+            ) {
+                if (file_exists($file)) {
+                    define('COMPOSER_INSTALL_PATH', $file);
+
+                    break;
+                }
+            }
+
+            unset($file);
+        }
+
+        require COMPOSER_INSTALL_PATH;
+    }
+
+    protected function fetchVersion(): void
+    {
+        $packageJson = json_decode(file_get_contents(__DIR__ . '/composer.json'), true, 512, JSON_THROW_ON_ERROR);
+
+        $name = $packageJson['name'] ?? null;
+        $this->name = explode('/', $name)[1] ?? null;
+    }
+})->main();

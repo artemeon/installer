@@ -1,0 +1,30 @@
+{
+    "name": "artemeon/installer",
+    "type": "project",
+    "license": "MIT",
+    "bin": [
+        "agp"
+    ],
+    "authors": [
+        {
+            "name": "Marc Reichel",
+            "email": "marc.reichel@artemeon.de"
+        }
+    ],
+    "autoload": {
+        "psr-4": {
+            "Artemeon\\Installer\\": "src/"
+        }
+    },
+    "require": {
+        "php": "^8.0",
+        "ext-json": "*",
+        "composer-runtime-api": "^2.2.2",
+        "nunomaduro/termwind": "^1.5",
+        "symfony/console": "^6.0.0",
+        "symfony/process": "^6.3.0"
+    },
+    "require-dev": {
+        "roave/security-advisories": "dev-latest"
+    }
+}
