@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Artemeon\Installer\Tests;
 
-use Artemeon\Installer\NewCommand;
+use Artemeon\Installer\Command\NewCommand;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Application;
 use Symfony\Component\Console\Tester\CommandTester;

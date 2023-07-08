@@ -2,9 +2,11 @@
 
 declare(strict_types=1);
 
-namespace Artemeon\Installer;
+namespace Artemeon\Installer\Command;
 
 use Artemeon\Console\Command;
+use Artemeon\Installer\Service\GitHub;
+use Artemeon\Installer\Service\TokenStore;
 use JsonException;
 use RuntimeException;
 use Symfony\Component\Process\Process;
@@ -15,7 +17,7 @@ class NewCommand extends Command
     protected string $signature = 'new
                                    {name : The name of the new project.}
                                    {--b|branch= : The branch to checkout.}
-                                   {--p|project= : The project to checkout.}';
+                                   {--p|project : The project to checkout.}';
 
     protected ?string $description = 'Create a new AGP project';
 
@@ -48,7 +50,24 @@ class NewCommand extends Command
 
         $this->header();
 
-        $project = $this->option('project');
+        $project = null;
+        $projects = [];
+        if ($this->option('project')) {
+            $token = TokenStore::getOrAsk($this->output);
+            if ($token) {
+                $this->info('Fetching available projects from GitHub ...');
+                try {
+                    $projects = GitHub::getProjects($token);
+                } catch (JsonException) {
+                }
+            }
+
+            if (count($projects)) {
+                $project = $this->choice('Which project do you want to check out?', $projects);
+            } else {
+                $project = $this->ask('Which project do you want to check out?');
+            }
+        }
         $isProject = false;
         if ($project) {
             $directoryExistsBefore = is_dir($absoluteDirectory);

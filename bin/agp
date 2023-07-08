@@ -3,7 +3,7 @@
 
 declare(strict_types=1);
 
-use Artemeon\Installer\NewCommand;
+use Artemeon\Installer\Command\NewCommand;
 use Symfony\Component\Console\Application;
 
 (new class() {
