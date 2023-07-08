@@ -1,9 +1,9 @@
 {
     "name": "artemeon/installer",
-    "type": "project",
+    "description": "Simplifies the setup of an AGP project.",
     "license": "MIT",
     "bin": [
-        "agp"
+        "bin/agp"
     ],
     "authors": [
         {
@@ -11,20 +11,29 @@
             "email": "marc.reichel@artemeon.de"
         }
     ],
+    "require": {
+        "php": "^8.1",
+        "ext-json": "*",
+        "composer-runtime-api": "^2.2.2",
+        "artemeon/console": "^0.2.0",
+        "symfony/process": "^6.3.0"
+    },
+    "require-dev": {
+        "roave/security-advisories": "dev-latest",
+        "phpunit/phpunit": "^10.2.3"
+    },
     "autoload": {
         "psr-4": {
             "Artemeon\\Installer\\": "src/"
         }
     },
-    "require": {
-        "php": "^8.0",
-        "ext-json": "*",
-        "composer-runtime-api": "^2.2.2",
-        "nunomaduro/termwind": "^1.5",
-        "symfony/console": "^6.0.0",
-        "symfony/process": "^6.3.0"
+    "autoload-dev": {
+        "psr-4": {
+            "Artemeon\\Installer\\Tests\\": "tests/"
+        }
     },
-    "require-dev": {
-        "roave/security-advisories": "dev-latest"
-    }
+    "config": {
+        "sort-packages": true
+    },
+    "prefer-stable": true
 }

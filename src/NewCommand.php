@@ -4,36 +4,33 @@ declare(strict_types=1);
 
 namespace Artemeon\Installer;
 
+use Artemeon\Console\Command;
 use JsonException;
 use RuntimeException;
-use Symfony\Component\Console\Input\InputArgument;
-use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Process\Process;
 use Throwable;
 
-use function Termwind\terminal;
-
 class NewCommand extends Command
 {
+    protected string $signature = 'new
+                                   {name : The name of the new project.}
+                                   {--b|branch : The branch to checkout.}
+                                   {--p|project : The project to checkout.}';
+
+    protected ?string $description = 'Create a new AGP project';
+
     private string $directory;
     private string $coreDirectory;
     private string $absoluteDirectory;
     private string $absoluteCoreDirectory;
 
-    protected function configure(): void
-    {
-        $this->setName('new')
-            ->setDescription('Create a new AGP project')
-            ->addArgument('name', InputArgument::REQUIRED)
-            ->addOption('branch', 'b', InputOption::VALUE_REQUIRED, 'The branch to checkout.', null)
-            ->addOption('project', 'p', InputOption::VALUE_REQUIRED, 'Which project to checkout.', null);
-    }
-
-    protected function handle(): int
+    public function __invoke(): int
     {
         $directory = $this->directory = $this->argument('name');
         if (str_contains($directory, '/')) {
-            throw new RuntimeException('Directory may not contain slashes.');
+            $this->error('Directory may not contain slashes.');
+
+            return self::INVALID;
         }
         $coreDirectory = $this->coreDirectory = $directory . DIRECTORY_SEPARATOR . 'core';
         $absoluteDirectory = $this->absoluteDirectory = getcwd() . DIRECTORY_SEPARATOR . $directory;
@@ -46,10 +43,7 @@ class NewCommand extends Command
             return self::FAILURE;
         }
 
-        terminal()->clear();
         $this->header();
-
-        $this->output->writeln('');
 
         $project = $this->option('project');
         $isProject = false;
@@ -65,11 +59,12 @@ class NewCommand extends Command
             }
             if (!$isProject) {
                 $this->error(sprintf('An error occurred while cloning "%s".', $project));
-                $this->output->write($cloneProject->getErrorOutput());
 
                 return self::FAILURE;
             }
-            $this->success(sprintf('Cloned %s into %s.', $project, $directory));
+            if ($this->output->isVerbose()) {
+                $this->success(sprintf('Cloned %s into %s.', $project, $directory));
+            }
         }
 
         if (!$isProject) {
@@ -77,7 +72,9 @@ class NewCommand extends Command
             if (!mkdir($absoluteDirectory) && !is_dir($directory)) {
                 throw new RuntimeException(sprintf('Directory "%s" was not created', $directory));
             }
-            $this->success(sprintf('Directory "%s" created.', $directory));
+            if ($this->output->isVerbose()) {
+                $this->success(sprintf('Directory "%s" created.', $directory));
+            }
 
             $this->info(sprintf('Cloning repository into "%s" ...', $coreDirectory));
             $parts = array_values(array_filter(['git', 'clone', $branch ? '-b' : null, $branch ?: null, 'https://github.com/artemeon/core-ng.git', 'core']));
@@ -85,11 +82,12 @@ class NewCommand extends Command
             $cloneProcess->run();
             if (!$cloneProcess->isSuccessful()) {
                 $this->error('An error occurred while cloning the repository.');
-                $this->output->write($cloneProcess->getErrorOutput());
 
                 return self::FAILURE;
             }
-            $this->success(sprintf('Repository cloned into "%s".', $coreDirectory));
+            if ($this->output->isVerbose()) {
+                $this->success(sprintf('Repository cloned into "%s".', $coreDirectory));
+            }
         }
 
         if (!$isProject && is_file($absoluteCoreDirectory . DIRECTORY_SEPARATOR . 'setupproject.php')) {
@@ -98,11 +96,12 @@ class NewCommand extends Command
             $setupProcess->run();
             if (!$setupProcess->isSuccessful()) {
                 $this->error('An error occurred while setting up the project.');
-                $this->output->write($setupProcess->getErrorOutput());
 
                 return self::FAILURE;
             }
-            $this->success('Project set up.');
+            if ($this->output->isVerbose()) {
+                $this->success('Project set up.');
+            }
 
             $this->buildFrontend();
         }
@@ -116,7 +115,9 @@ class NewCommand extends Command
         try {
             if ($this->setupValet()) {
                 $valetAvailable = true;
-                $this->success('Laravel Valet site set up.');
+                if ($this->output->isVerbose()) {
+                    $this->success('Laravel Valet site set up.');
+                }
             }
         } catch (Throwable $e) {
             $this->error($e->getMessage());
@@ -128,8 +129,7 @@ class NewCommand extends Command
             $composerInstalled = $composerInstall->isSuccessful();
             if (!$composerInstalled) {
                 $this->error('An error occurred while installing Composer dependencies.');
-                $this->output->write($composerInstall->getErrorOutput());
-            } else {
+            } elseif ($this->output->isVerbose()) {
                 $this->success('Composer dependencies installed.');
             }
         }
@@ -146,54 +146,69 @@ class NewCommand extends Command
         }
 
         if ($envExampleExists && !$envExists) {
-            $this->title('Final steps');
-
-            if ($valetAvailable) {
-                $webRoot = $defaultWebRoot;
-            } else {
-                $webRoot = $this->ask('Web root', $defaultWebRoot);
-            }
-            $dbHost = $this->ask('Database Host', '127.0.0.1');
-            $dbUsername = $this->ask('Database Username', 'root');
-            $dbPassword = $this->ask('Database Password', '', true);
-            $dbName = $this->ask('Database Name', $directory);
-
-            $this->output->writeln('');
+            $this->section('Final steps');
 
             (new Process(['cp', '.env.example', '.env'], $directory))->run();
 
-            $envFile = $directory . DIRECTORY_SEPARATOR . '.env';
-            $envFileContent = file_get_contents($envFile);
-            $envFileContent = preg_replace('/^AGP_URL=[.*]*$/m', 'AGP_URL=' . $webRoot, $envFileContent);
-            $envFileContent = preg_replace('/^AGP_DB_HOST=[.*]*$/m', 'AGP_DB_HOST=' . $dbHost, $envFileContent);
-            $envFileContent = preg_replace('/^AGP_DB_USER=[.*]*$/m', 'AGP_DB_USER=' . $dbUsername, $envFileContent);
-            $envFileContent = preg_replace('/^AGP_DB_PW=[.*]*$/m', 'AGP_DB_PW=' . $dbPassword, $envFileContent);
-            $envFileContent = preg_replace('/^AGP_DB_DB=[.*]*$/m', 'AGP_DB_DB=' . $dbName, $envFileContent);
+            $envUpdated = false;
+            $dbName = null;
+            if ($this->input->isInteractive()) {
+                if ($valetAvailable) {
+                    $webRoot = $defaultWebRoot;
+                } else {
+                    $webRoot = $this->ask('Web root', $defaultWebRoot);
+                }
+                $dbHost = $this->ask('Database Host', '127.0.0.1');
+                $dbUsername = $this->ask('Database Username', 'root');
+                $dbPassword = $this->secret('Database Password');
+                $dbName = $this->ask('Database Name', $directory);
 
-            file_put_contents($absoluteDirectory . DIRECTORY_SEPARATOR . '.env', $envFileContent);
+                $this->newLine();
 
-            $this->success(sprintf('"%s" updated.', $envFile));
+                $envFile = $directory . DIRECTORY_SEPARATOR . '.env';
+                $envFileContent = file_get_contents($envFile);
+                $envFileContent = preg_replace('/^AGP_URL=[.*]*$/m', 'AGP_URL=' . $webRoot, $envFileContent);
+                $envFileContent = preg_replace('/^AGP_DB_HOST=[.*]*$/m', 'AGP_DB_HOST=' . $dbHost, $envFileContent);
+                $envFileContent = preg_replace('/^AGP_DB_USER=[.*]*$/m', 'AGP_DB_USER=' . $dbUsername, $envFileContent);
+                $envFileContent = preg_replace('/^AGP_DB_PW=[.*]*$/m', 'AGP_DB_PW=' . $dbPassword, $envFileContent);
+                $envFileContent = preg_replace('/^AGP_DB_DB=[.*]*$/m', 'AGP_DB_DB=' . $dbName, $envFileContent);
 
-            if (!$isProject) {
+                file_put_contents($absoluteDirectory . DIRECTORY_SEPARATOR . '.env', $envFileContent);
+
+                $this->info(sprintf('"%s" updated.', $envFile));
+                $envUpdated = true;
+            }
+
+            if (!$isProject && $envUpdated && $dbName) {
                 $this->info(sprintf('Installing AGP into database "%s" ...', $dbName));
-                $this->output->writeln('          This may take a while.');
-                $this->output->writeln('');
 
                 $installAgp = Process::fromShellCommandline('php console.php install', $directory, timeout: 3600);
                 $installAgp->run();
                 if (!$installAgp->isSuccessful()) {
                     $this->error('An error occurred while installing the AGP.');
-                    $this->output->write($installAgp->getErrorOutput());
-                } else {
+                } elseif ($this->output->isVerbose()) {
                     $this->success(sprintf('AGP installed into database "%s".', $dbName));
                 }
             }
         }
 
-        $this->title('Summary');
+        $this->section('Summary');
         $this->success('Done.');
 
         return self::SUCCESS;
+    }
+
+    private function header(): void
+    {
+        $this->output->writeln('');
+        $this->output->writeln('<fg=blue>    __  __  __ </>    _____           _        _ _           ');
+        $this->output->writeln('<fg=blue>   /_/ /_/ /#/ </>   |_   _|         | |      | | |          ');
+        $this->output->writeln('<fg=blue>      __  __   </>     | |  _ __  ___| |_ __ _| | | ___ _ __ ');
+        $this->output->writeln('<fg=blue>     /_/ /_/   </>     | | | \'_ \/ __| __/ _` | | |/ _ \ \'__|');
+        $this->output->writeln('<fg=blue>        __     </>    _| |_| | | \__ \ || (_| | | |  __/ |   ');
+        $this->output->writeln('<fg=blue>       /_/     </>   |_____|_| |_|___/\__\__,_|_|_|\___|_|   ');
+        $this->output->writeln('');
+        $this->output->writeln('');
     }
 
     private function buildFrontend(): void
@@ -207,17 +222,17 @@ class NewCommand extends Command
             $pnpmInstall->run();
             if (!$pnpmInstall->isSuccessful()) {
                 $this->error('An error occurred while installing dependencies.');
-                $this->output->write($pnpmInstall->getErrorOutput());
             } else {
-                $this->success('Dependencies installed.');
+                if ($this->output->isVerbose()) {
+                    $this->success('Dependencies installed.');
+                }
 
                 $this->info('Building front-end assets ...');
                 $pnpmRunDev = new Process(['pnpm', 'dev'], $buildFilesDirectory);
                 $pnpmRunDev->run();
                 if (!$pnpmRunDev->isSuccessful()) {
                     $this->error('An error occurred while building the front-end assets.');
-                    $this->output->write($pnpmRunDev->getErrorOutput());
-                } else {
+                } elseif ($this->output->isVerbose()) {
                     $this->success('Front-end assets built.');
                 }
             }
@@ -232,11 +247,11 @@ class NewCommand extends Command
         $detectValet = new Process(['valet', '-V']);
         $detectValet->run();
 
-        if (!$detectValet->isSuccessful()) {
+        if (!$detectValet->isSuccessful() || getenv('TESTING') !== false) {
             return false;
         }
 
-        $this->title(trim($detectValet->getOutput()));
+        $this->section(trim($detectValet->getOutput()));
 
         $this->info('Setting up Laravel Valet site ...');
 
@@ -244,7 +259,9 @@ class NewCommand extends Command
         $linkProcess->run();
 
         if ($linkProcess->isSuccessful()) {
-            $this->success($linkProcess->getOutput());
+            if ($this->output->isVerbose()) {
+                $this->success($linkProcess->getOutput());
+            }
         } else {
             $this->error($linkProcess->getErrorOutput());
         }
@@ -260,12 +277,14 @@ class NewCommand extends Command
         $minifiedPhpVersion = implode('.', array_slice($parts, 0, 2));
         $prefixedPhpVersion = 'php@' . $minifiedPhpVersion;
 
-        $this->info(sprintf('Isolating site to use PHP version %s.', $minifiedPhpVersion));
+        $this->info(sprintf('Isolating site to use %s ...', $prefixedPhpVersion));
 
         $isolateProcess = new Process(['valet', 'isolate', $prefixedPhpVersion], $this->directory);
         $isolateProcess->run();
 
-        $this->success(sprintf('The site is now using %s', $prefixedPhpVersion));
+        if ($this->output->isVerbose()) {
+            $this->success(sprintf('The site is now using %s', $prefixedPhpVersion));
+        }
 
         return true;
     }

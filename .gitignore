@@ -1,3 +1,6 @@
 vendor/
 .idea/
+my-app/
+.phpunit.cache/
+.phpunit.result.cache
 composer.lock

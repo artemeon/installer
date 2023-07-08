@@ -12,8 +12,14 @@
     </a>
 </p>
 
+<p align="center">Simplifies the setup of an AGP project.</p>
+
 ## 🚀 Installation
 
-```
+```shell
 composer global require artemeon/installer
 ```
+
+## License
+
+The AGP Installer is open-sourced software licensed under the [MIT license](LICENSE).

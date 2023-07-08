@@ -28,9 +28,9 @@ use Symfony\Component\Console\Application;
         } else {
             foreach (
                 [
-                    __DIR__ . '/../../autoload.php',
-                    __DIR__ . '/../vendor/autoload.php',
-                    __DIR__ . '/vendor/autoload.php'
+                    __DIR__ . '/../../../autoload.php',
+                    __DIR__ . '/../../vendor/autoload.php',
+                    __DIR__ . '/../vendor/autoload.php'
                 ] as $file
             ) {
                 if (file_exists($file)) {
@@ -48,7 +48,7 @@ use Symfony\Component\Console\Application;
 
     protected function fetchVersion(): void
     {
-        $packageJson = json_decode(file_get_contents(__DIR__ . '/composer.json'), true, 512, JSON_THROW_ON_ERROR);
+        $packageJson = json_decode(file_get_contents(__DIR__ . '/../composer.json'), true, 512, JSON_THROW_ON_ERROR);
 
         $name = $packageJson['name'] ?? null;
         $this->name = explode('/', $name)[1] ?? null;
