@@ -19,6 +19,7 @@ class NewCommand extends Command
 
     protected ?string $description = 'Create a new AGP project';
 
+    private string $currentDirectory;
     private string $directory;
     private string $coreDirectory;
     private string $absoluteDirectory;
@@ -26,6 +27,8 @@ class NewCommand extends Command
 
     public function __invoke(): int
     {
+        $start = microtime(true);
+        $this->currentDirectory = getcwd();
         $directory = $this->directory = $this->argument('name');
         if (str_contains($directory, '/')) {
             $this->error('Directory may not contain slashes.');
@@ -145,12 +148,13 @@ class NewCommand extends Command
             $defaultWebRoot = $directory . '.' . trim($valetTld);
         }
 
+        $webRoot = null;
+        $envUpdated = false;
         if ($envExampleExists && !$envExists) {
             $this->section('Final steps');
 
             (new Process(['cp', '.env.example', '.env'], $directory))->run();
 
-            $envUpdated = false;
             $dbName = null;
             if ($this->input->isInteractive()) {
                 if ($valetAvailable) {
@@ -158,6 +162,13 @@ class NewCommand extends Command
                 } else {
                     $webRoot = $this->ask('Web root', $defaultWebRoot);
                 }
+
+                $envFile = $directory . DIRECTORY_SEPARATOR . '.env';
+                $envFileContent = file_get_contents($envFile);
+                $envFileContent = preg_replace('/^AGP_URL=[.*]*$/m', 'AGP_URL=' . $webRoot, $envFileContent);
+                file_put_contents($absoluteDirectory . DIRECTORY_SEPARATOR . '.env', $envFileContent);
+                $envFileContent = file_get_contents($envFile);
+
                 $dbHost = $this->ask('Database Host', '127.0.0.1');
                 $dbUsername = $this->ask('Database Username', 'root');
                 $dbPassword = $this->secret('Database Password');
@@ -165,8 +176,6 @@ class NewCommand extends Command
 
                 $this->newLine();
 
-                $envFile = $directory . DIRECTORY_SEPARATOR . '.env';
-                $envFileContent = file_get_contents($envFile);
                 $envFileContent = preg_replace('/^AGP_URL=[.*]*$/m', 'AGP_URL=' . $webRoot, $envFileContent);
                 $envFileContent = preg_replace('/^AGP_DB_HOST=[.*]*$/m', 'AGP_DB_HOST=' . $dbHost, $envFileContent);
                 $envFileContent = preg_replace('/^AGP_DB_USER=[.*]*$/m', 'AGP_DB_USER=' . $dbUsername, $envFileContent);
@@ -195,20 +204,29 @@ class NewCommand extends Command
         $this->section('Summary');
         $this->success('Done.');
 
+        $time_elapsed_secs = microtime(true) - $start;
+
+        if ($this->output->isVerbose()) {
+            $this->info(sprintf('Finished after %d seconds.',  round($time_elapsed_secs, 2)));
+        }
+
+        $this->info('🌐 https://' . $webRoot);
+
         return self::SUCCESS;
     }
 
     private function header(): void
     {
-        $this->output->writeln('');
-        $this->output->writeln('<fg=blue>    __  __  __ </>    _____           _        _ _           ');
-        $this->output->writeln('<fg=blue>   /_/ /_/ /#/ </>   |_   _|         | |      | | |          ');
-        $this->output->writeln('<fg=blue>      __  __   </>     | |  _ __  ___| |_ __ _| | | ___ _ __ ');
-        $this->output->writeln('<fg=blue>     /_/ /_/   </>     | | | \'_ \/ __| __/ _` | | |/ _ \ \'__|');
-        $this->output->writeln('<fg=blue>        __     </>    _| |_| | | \__ \ || (_| | | |  __/ |   ');
-        $this->output->writeln('<fg=blue>       /_/     </>   |_____|_| |_|___/\__\__,_|_|_|\___|_|   ');
-        $this->output->writeln('');
-        $this->output->writeln('');
+        $this->newLine();
+        $this->output->write(<<<OUTPUT
+<fg=blue>    __  __  __ </>    _____           _        _ _
+<fg=blue>   /_/ /_/ /#/ </>   |_   _|         | |      | | |
+<fg=blue>      __  __   </>     | |  _ __  ___| |_ __ _| | | ___ _ __
+<fg=blue>     /_/ /_/   </>     | | | '_ \/ __| __/ _` | | |/ _ \ '__|
+<fg=blue>        __     </>    _| |_| | | \__ \ || (_| | | |  __/ |
+<fg=blue>       /_/     </>   |_____|_| |_|___/\__\__,_|_|_|\___|_|
+OUTPUT);
+        $this->newLine(3);
     }
 
     private function buildFrontend(): void
@@ -246,6 +264,8 @@ class NewCommand extends Command
     {
         $detectValet = new Process(['valet', '-V']);
         $detectValet->run();
+        $version = trim(str_replace('Laravel Valet', '', $detectValet->getOutput()));
+        [$majorVersion] = explode('.', $version);
 
         if (!$detectValet->isSuccessful() || getenv('TESTING') !== false) {
             return false;
@@ -253,17 +273,52 @@ class NewCommand extends Command
 
         $this->section(trim($detectValet->getOutput()));
 
-        $this->info('Setting up Laravel Valet site ...');
+        $valetDriversDirectory = $_SERVER['HOME'] . '/.config/valet/Drivers';
+        $agpValetDriverDirectory = $valetDriversDirectory . '/agp-valet-driver';
+        $driverFileGlob = glob($valetDriversDirectory .'/*/src/AgpValetDriver.php');
 
-        $linkProcess = new Process(['valet', 'link', '--secure'], $this->directory);
-        $linkProcess->run();
-
-        if ($linkProcess->isSuccessful()) {
+        if (!count($driverFileGlob)) {
+            $this->info('Cloning AGP Valet Driver ...');
             if ($this->output->isVerbose()) {
-                $this->success($linkProcess->getOutput());
+                $this->info($agpValetDriverDirectory);
+            }
+
+            $branch = (int) $majorVersion >= 4 ? 'v4' : 'main';
+            $cloneAgpValetDriver = new Process(['git', 'clone', '-b', $branch, 'https://github.com/artemeon/agp-valet-driver.git'], $valetDriversDirectory);
+            $cloneAgpValetDriver->run();
+        }
+
+        $getParkedDirectories = new Process(['valet', 'paths']);
+        $getParkedDirectories->run();
+        $parkedDirectories = json_decode(trim($getParkedDirectories->getOutput()), true, 512, JSON_THROW_ON_ERROR);
+        $isParked = in_array($this->currentDirectory, $parkedDirectories, true);
+
+        if (!$isParked) {
+            $this->info('Setting up Laravel Valet site ...');
+
+            $linkProcess = new Process(['valet', 'link', '--secure'], $this->directory);
+            $linkProcess->run();
+
+            if ($linkProcess->isSuccessful()) {
+                if ($this->output->isVerbose()) {
+                    $this->success($linkProcess->getOutput());
+                }
+            } else {
+                $this->error($linkProcess->getErrorOutput());
             }
         } else {
-            $this->error($linkProcess->getErrorOutput());
+            $this->info('Setting up Laravel Valet site ...');
+
+            $secureProcess = new Process(['valet', 'secure'], $this->directory);
+            $secureProcess->run();
+
+            if ($secureProcess->isSuccessful()) {
+                if ($this->output->isVerbose()) {
+                    $this->success($secureProcess->getOutput());
+                }
+            } else {
+                $this->error($secureProcess->getErrorOutput());
+            }
         }
 
         $composerJsonPath = $this->absoluteCoreDirectory . DIRECTORY_SEPARATOR . 'composer.json';
