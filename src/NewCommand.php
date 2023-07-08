@@ -14,8 +14,8 @@ class NewCommand extends Command
 {
     protected string $signature = 'new
                                    {name : The name of the new project.}
-                                   {--b|branch : The branch to checkout.}
-                                   {--p|project : The project to checkout.}';
+                                   {--b|branch= : The branch to checkout.}
+                                   {--p|project= : The project to checkout.}';
 
     protected ?string $description = 'Create a new AGP project';
 
