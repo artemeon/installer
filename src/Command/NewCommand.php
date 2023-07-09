@@ -5,14 +5,19 @@ declare(strict_types=1);
 namespace Artemeon\Installer\Command;
 
 use Artemeon\Console\Command;
+use Artemeon\Installer\Service\Frontend;
 use Artemeon\Installer\Service\GitHub;
+use Artemeon\Installer\Service\Header;
+use Artemeon\Installer\Service\ProjectMatcher;
 use Artemeon\Installer\Service\TokenStore;
+use Artemeon\Installer\Service\Valet;
 use JsonException;
 use RuntimeException;
+use Symfony\Component\Console\Command\SignalableCommandInterface;
 use Symfony\Component\Process\Process;
 use Throwable;
 
-class NewCommand extends Command
+class NewCommand extends Command implements SignalableCommandInterface
 {
     protected string $signature = 'new
                                    {name : The name of the new project.}
@@ -21,25 +26,25 @@ class NewCommand extends Command
 
     protected ?string $description = 'Create a new AGP project';
 
-    private string $currentDirectory;
-    private string $directory;
-    private string $coreDirectory;
-    private string $absoluteDirectory;
-    private string $absoluteCoreDirectory;
+    protected array $aliases = ['make', 'create'];
+
+    private ?string $directory = null;
+    private bool $valetDone = false;
 
     public function __invoke(): int
     {
+        $this->valetDone = false;
         $start = microtime(true);
-        $this->currentDirectory = getcwd();
+        $currentDirectory = getcwd();
         $directory = $this->directory = $this->argument('name');
         if (str_contains($directory, '/')) {
             $this->error('Directory may not contain slashes.');
 
             return self::INVALID;
         }
-        $coreDirectory = $this->coreDirectory = $directory . DIRECTORY_SEPARATOR . 'core';
-        $absoluteDirectory = $this->absoluteDirectory = getcwd() . DIRECTORY_SEPARATOR . $directory;
-        $absoluteCoreDirectory = $this->absoluteCoreDirectory = getcwd() . DIRECTORY_SEPARATOR . $coreDirectory;
+        $coreDirectory = $directory . DIRECTORY_SEPARATOR . 'core';
+        $absoluteDirectory = getcwd() . DIRECTORY_SEPARATOR . $directory;
+        $absoluteCoreDirectory = getcwd() . DIRECTORY_SEPARATOR . $coreDirectory;
         $branch = $this->option('branch');
 
         if (is_dir($absoluteDirectory)) {
@@ -48,7 +53,7 @@ class NewCommand extends Command
             return self::FAILURE;
         }
 
-        $this->header();
+        Header::print($this->output);
 
         $project = null;
         $projects = [];
@@ -63,7 +68,12 @@ class NewCommand extends Command
             }
 
             if (count($projects)) {
-                $project = $this->choice('Which project do you want to check out?', $projects);
+                $closestMatch = ProjectMatcher::closest($directory, $projects);
+                if ($this->confirm(sprintf('Do you want to check out "%s"?', $closestMatch), true)) {
+                    $project = $closestMatch;
+                } else {
+                    $project = $this->choice('Which project do you want to check out?', $projects);
+                }
             } else {
                 $project = $this->ask('Which project do you want to check out?');
             }
@@ -125,21 +135,22 @@ class NewCommand extends Command
                 $this->success('Project set up.');
             }
 
-            $this->buildFrontend();
+            Frontend::build($this->output, $coreDirectory);
         }
 
         if ($isProject) {
-            $this->buildFrontend();
+            Frontend::build($this->output, $coreDirectory);
         }
 
         $valetAvailable = false;
 
         try {
-            if ($this->setupValet()) {
+            if (Valet::setup($this->output, $directory, $currentDirectory, $absoluteCoreDirectory)) {
                 $valetAvailable = true;
                 if ($this->output->isVerbose()) {
                     $this->success('Laravel Valet site set up.');
                 }
+                $this->valetDone = true;
             }
         } catch (Throwable $e) {
             $this->error($e->getMessage());
@@ -170,7 +181,7 @@ class NewCommand extends Command
         $webRoot = null;
         $envUpdated = false;
         if ($envExampleExists && !$envExists) {
-            $this->section('Final steps');
+            $this->section('Environment Setup');
 
             (new Process(['cp', '.env.example', '.env'], $directory))->run();
 
@@ -234,132 +245,43 @@ class NewCommand extends Command
         return self::SUCCESS;
     }
 
-    private function header(): void
+    public function getSubscribedSignals(): array
     {
-        $this->newLine();
-        $this->output->write(<<<OUTPUT
-<fg=blue>    __  __  __ </>    _____           _        _ _
-<fg=blue>   /_/ /_/ /#/ </>   |_   _|         | |      | | |
-<fg=blue>      __  __   </>     | |  _ __  ___| |_ __ _| | | ___ _ __
-<fg=blue>     /_/ /_/   </>     | | | '_ \/ __| __/ _` | | |/ _ \ '__|
-<fg=blue>        __     </>    _| |_| | | \__ \ || (_| | | |  __/ |
-<fg=blue>       /_/     </>   |_____|_| |_|___/\__\__,_|_|_|\___|_|
-OUTPUT);
-        $this->newLine(3);
+        return [SIGINT];
     }
 
-    private function buildFrontend(): void
+    public function handleSignal(int $signal): void
     {
-        $detectPnpm = new Process(['pnpm', '--version']);
-        $detectPnpm->run();
-        if ($detectPnpm->isSuccessful()) {
-            $buildFilesDirectory = $this->coreDirectory . DIRECTORY_SEPARATOR . '_buildfiles';
-            $this->info('Installing front-end dependencies ...');
-            $pnpmInstall = new Process(['pnpm', 'install'], $buildFilesDirectory);
-            $pnpmInstall->run();
-            if (!$pnpmInstall->isSuccessful()) {
-                $this->error('An error occurred while installing dependencies.');
-            } else {
-                if ($this->output->isVerbose()) {
-                    $this->success('Dependencies installed.');
+        if ($signal === SIGINT && $this->directory) {
+            $directory = getcwd() . DIRECTORY_SEPARATOR . $this->directory;
+            if (is_dir($directory)) {
+                $this->info('🧹 Cleaning up the mess ...');
+                if ($this->valetDone) {
+                    (new Process(['valet', 'unisolate'], $this->directory))->run();
+                    (new Process(['valet', 'unsecure'], $this->directory))->run();
+                    (new Process(['valet', 'unlink'], $this->directory))->run();
                 }
-
-                $this->info('Building front-end assets ...');
-                $pnpmRunDev = new Process(['pnpm', 'dev'], $buildFilesDirectory);
-                $pnpmRunDev->run();
-                if (!$pnpmRunDev->isSuccessful()) {
-                    $this->error('An error occurred while building the front-end assets.');
-                } elseif ($this->output->isVerbose()) {
-                    $this->success('Front-end assets built.');
-                }
+                $this->rrmdir($directory);
+                $this->info('✨ You\'re good to go.');
             }
         }
     }
 
-    /**
-     * @throws JsonException
-     */
-    private function setupValet(): bool
+    private function rrmdir(string $directory): void
     {
-        $detectValet = new Process(['valet', '-V']);
-        $detectValet->run();
-        $version = trim(str_replace('Laravel Valet', '', $detectValet->getOutput()));
-        [$majorVersion] = explode('.', $version);
-
-        if (!$detectValet->isSuccessful() || getenv('TESTING') !== false) {
-            return false;
-        }
-
-        $this->section(trim($detectValet->getOutput()));
-
-        $valetDriversDirectory = $_SERVER['HOME'] . '/.config/valet/Drivers';
-        $agpValetDriverDirectory = $valetDriversDirectory . '/agp-valet-driver';
-        $driverFileGlob = glob($valetDriversDirectory .'/*/src/AgpValetDriver.php');
-
-        if (!count($driverFileGlob)) {
-            $this->info('Cloning AGP Valet Driver ...');
-            if ($this->output->isVerbose()) {
-                $this->info($agpValetDriverDirectory);
-            }
-
-            $branch = (int) $majorVersion >= 4 ? 'v4' : 'main';
-            $cloneAgpValetDriver = new Process(['git', 'clone', '-b', $branch, 'https://github.com/artemeon/agp-valet-driver.git'], $valetDriversDirectory);
-            $cloneAgpValetDriver->run();
-        }
-
-        $getParkedDirectories = new Process(['valet', 'paths']);
-        $getParkedDirectories->run();
-        $parkedDirectories = json_decode(trim($getParkedDirectories->getOutput()), true, 512, JSON_THROW_ON_ERROR);
-        $isParked = in_array($this->currentDirectory, $parkedDirectories, true);
-
-        if (!$isParked) {
-            $this->info('Setting up Laravel Valet site ...');
-
-            $linkProcess = new Process(['valet', 'link', '--secure'], $this->directory);
-            $linkProcess->run();
-
-            if ($linkProcess->isSuccessful()) {
-                if ($this->output->isVerbose()) {
-                    $this->success($linkProcess->getOutput());
+        if (is_dir($directory)) {
+            $objects = scandir($directory);
+            foreach ($objects as $object) {
+                if ($object !== '.' && $object !== '..') {
+                    $path = $directory . DIRECTORY_SEPARATOR . $object;
+                    if (is_dir($path) && !is_link($path)) {
+                        $this->rrmdir($path);
+                    } else {
+                        unlink($path);
+                    }
                 }
-            } else {
-                $this->error($linkProcess->getErrorOutput());
             }
-        } else {
-            $this->info('Setting up Laravel Valet site ...');
-
-            $secureProcess = new Process(['valet', 'secure'], $this->directory);
-            $secureProcess->run();
-
-            if ($secureProcess->isSuccessful()) {
-                if ($this->output->isVerbose()) {
-                    $this->success($secureProcess->getOutput());
-                }
-            } else {
-                $this->error($secureProcess->getErrorOutput());
-            }
+            rmdir($directory);
         }
-
-        $composerJsonPath = $this->absoluteCoreDirectory . DIRECTORY_SEPARATOR . 'composer.json';
-        if (!is_file($composerJsonPath)) {
-            return true;
-        }
-        $composerJsonContent = file_get_contents($composerJsonPath);
-        $composerJson = json_decode($composerJsonContent, false, 512, JSON_THROW_ON_ERROR);
-        $phpVersion = (string) $composerJson->config?->platform?->php;
-        $parts = explode('.', $phpVersion);
-        $minifiedPhpVersion = implode('.', array_slice($parts, 0, 2));
-        $prefixedPhpVersion = 'php@' . $minifiedPhpVersion;
-
-        $this->info(sprintf('Isolating site to use %s ...', $prefixedPhpVersion));
-
-        $isolateProcess = new Process(['valet', 'isolate', $prefixedPhpVersion], $this->directory);
-        $isolateProcess->run();
-
-        if ($this->output->isVerbose()) {
-            $this->success(sprintf('The site is now using %s', $prefixedPhpVersion));
-        }
-
-        return true;
     }
 }
