@@ -1,4 +1,6 @@
-<h1 align="center">AGP Installer</h1>
+<h1 align="center">
+    <img src="art/logo.svg">
+</h1>
 
 <p align="center">
     <a href="https://packagist.org/packages/artemeon/installer">
