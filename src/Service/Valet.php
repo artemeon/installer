@@ -55,7 +55,8 @@ class Valet
                     $output->success($linkProcess->getOutput());
                 }
             } else {
-                $output->error($linkProcess->getErrorOutput());
+                $output->error('An error occurred while linking the directory.');
+                $output->write($linkProcess->getErrorOutput());
             }
         } else {
             $secureProcess = new Process(['valet', 'secure'], $directory);
@@ -66,7 +67,8 @@ class Valet
                     $output->success($secureProcess->getOutput());
                 }
             } else {
-                $output->error($secureProcess->getErrorOutput());
+                $output->error('An error occurred while securing the site.');
+                $output->write($secureProcess->getErrorOutput());
             }
         }
 
@@ -86,7 +88,10 @@ class Valet
         $isolateProcess = new Process(['valet', 'isolate', $prefixedPhpVersion], $directory);
         $isolateProcess->run();
 
-        if ($output->isVerbose()) {
+        if (!$isolateProcess->isSuccessful()) {
+            $output->error('An error occurred while isolating the site.');
+            $output->write($isolateProcess->getErrorOutput());
+        } elseif ($output->isVerbose()) {
             $output->success(sprintf('The site is now using %s', $prefixedPhpVersion));
         }
 

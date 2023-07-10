@@ -91,6 +91,7 @@ class NewCommand extends Command implements SignalableCommandInterface
             }
             if (!$isProject) {
                 $this->error(sprintf('An error occurred while cloning "%s".', $project));
+                $this->output->write($cloneProject->getErrorOutput());
 
                 return self::FAILURE;
             }
@@ -114,6 +115,7 @@ class NewCommand extends Command implements SignalableCommandInterface
             $cloneProcess->run();
             if (!$cloneProcess->isSuccessful()) {
                 $this->error('An error occurred while cloning the repository.');
+                $this->output->write($cloneProcess->getErrorOutput());
 
                 return self::FAILURE;
             }
@@ -128,6 +130,7 @@ class NewCommand extends Command implements SignalableCommandInterface
             $setupProcess->run();
             if (!$setupProcess->isSuccessful()) {
                 $this->error('An error occurred while setting up the project.');
+                $this->output->write($setupProcess->getErrorOutput());
 
                 return self::FAILURE;
             }
@@ -162,7 +165,12 @@ class NewCommand extends Command implements SignalableCommandInterface
             $composerInstalled = $composerInstall->isSuccessful();
             if (!$composerInstalled) {
                 $this->error('An error occurred while installing Composer dependencies.');
-            } elseif ($this->output->isVerbose()) {
+                $this->output->write($composerInstall->getErrorOutput());
+
+                return self::FAILURE;
+            }
+
+            if ($this->output->isVerbose()) {
                 $this->success('Composer dependencies installed.');
             }
         }
@@ -170,7 +178,7 @@ class NewCommand extends Command implements SignalableCommandInterface
         $envExampleExists = is_file($absoluteDirectory . DIRECTORY_SEPARATOR . '.env.example');
         $envExists = is_file($absoluteDirectory . DIRECTORY_SEPARATOR . '.env');
 
-        $defaultWebRoot = 'dev.artemeon.de/' . $directory;
+        $defaultWebRoot = $directory . '.artemeon.de/';
         if ($valetAvailable) {
             $getValetTld = new Process(['valet', 'tld']);
             $getValetTld->run();
@@ -225,7 +233,12 @@ class NewCommand extends Command implements SignalableCommandInterface
                 $installAgp->run();
                 if (!$installAgp->isSuccessful()) {
                     $this->error('An error occurred while installing the AGP.');
-                } elseif ($this->output->isVerbose()) {
+                    $this->output->write($installAgp->getErrorOutput());
+
+                    return self::FAILURE;
+                }
+
+                if ($this->output->isVerbose()) {
                     $this->success(sprintf('AGP installed into database "%s".', $dbName));
                 }
             }

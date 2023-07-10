@@ -20,6 +20,7 @@ class Frontend
             $pnpmInstall->run();
             if (!$pnpmInstall->isSuccessful()) {
                 $output->error('An error occurred while installing dependencies.');
+                $output->write($pnpmInstall->getErrorOutput());
             } else {
                 if ($output->isVerbose()) {
                     $output->success('Dependencies installed.');
@@ -30,6 +31,7 @@ class Frontend
                 $pnpmRunDev->run();
                 if (!$pnpmRunDev->isSuccessful()) {
                     $output->error('An error occurred while building the front-end assets.');
+                    $output->write($pnpmRunDev->getErrorOutput());
                 } elseif ($output->isVerbose()) {
                     $output->success('Front-end assets built.');
                 }

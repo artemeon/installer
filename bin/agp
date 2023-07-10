@@ -4,17 +4,16 @@
 declare(strict_types=1);
 
 use Artemeon\Installer\Command\NewCommand;
+use Artemeon\Installer\Service\Version;
 use Symfony\Component\Console\Application;
 
 (new class() {
-    private string $name;
-
     public function main(): void
     {
         $this->autoload();
         $this->fetchVersion();
 
-        $app = new Application($this->name);
+        $app = new Application('AGP Installer', Version::fetchVersion());
         $app->add(new NewCommand());
         $app->run();
     }
@@ -51,6 +50,5 @@ use Symfony\Component\Console\Application;
         $packageJson = json_decode(file_get_contents(__DIR__ . '/../composer.json'), true, 512, JSON_THROW_ON_ERROR);
 
         $name = $packageJson['name'] ?? null;
-        $this->name = explode('/', $name)[1] ?? null;
     }
 })->main();
