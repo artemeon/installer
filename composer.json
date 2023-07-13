@@ -12,14 +12,14 @@
         }
     ],
     "require": {
-        "php": "^8.1",
+        "php": ">=8.0",
         "ext-json": "*",
         "ext-pcntl": "*",
-        "ahinkle/packagist-latest-version": "^2.0",
         "composer-runtime-api": "^2.2.2",
-        "artemeon/console": "^0.2.0",
+        "ahinkle/packagist-latest-version": "^2.0",
+        "artemeon/console": "^0.3.0",
         "guzzlehttp/guzzle": "^7.3.0",
-        "symfony/process": "^6.3.0"
+        "symfony/process": "^5.0|^6.0"
     },
     "require-dev": {
         "roave/security-advisories": "dev-latest",
