@@ -253,7 +253,12 @@ class NewCommand extends Command implements SignalableCommandInterface
             $this->info(sprintf('Finished after %d seconds.',  round($time_elapsed_secs, 2)));
         }
 
-        $this->info('🌐 https://' . $webRoot);
+        $url = 'https://' . $webRoot;
+        $this->info('🌐 ' . $url);
+        if (!$isProject && $valetAvailable) {
+            $user = $_SERVER['SUDO_USER'] ?? $_SERVER['USER'];
+            (new Process(['sudo', '-u', $user, 'open', $url]))->run();
+        }
 
         return self::SUCCESS;
     }
