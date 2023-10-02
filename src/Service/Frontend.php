@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Artemeon\Installer\Service;
 
-use Artemeon\Console\Style\ArtemeonStyle;
+use Artemeon\Console\Styles\ArtemeonStyle;
 use Symfony\Component\Process\Process;
 
 class Frontend
