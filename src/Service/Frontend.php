@@ -16,7 +16,7 @@ class Frontend
         if ($detectPnpm->isSuccessful()) {
             $buildFilesDirectory = $coreDirectory . DIRECTORY_SEPARATOR . '_buildfiles';
             $output->info('Installing front-end dependencies ...');
-            $pnpmInstall = new Process(['pnpm', 'install'], $buildFilesDirectory);
+            $pnpmInstall = new Process(['pnpm', 'install'], $buildFilesDirectory, timeout: 3600);
             $pnpmInstall->run();
             if (!$pnpmInstall->isSuccessful()) {
                 $output->error('An error occurred while installing dependencies.');
@@ -27,7 +27,7 @@ class Frontend
                 }
 
                 $output->info('Building front-end assets ...');
-                $pnpmRunDev = new Process(['pnpm', 'dev'], $buildFilesDirectory);
+                $pnpmRunDev = new Process(['pnpm', 'dev'], $buildFilesDirectory, timeout: 3600);
                 $pnpmRunDev->run();
                 if (!$pnpmRunDev->isSuccessful()) {
                     $output->error('An error occurred while building the front-end assets.');

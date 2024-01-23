@@ -126,7 +126,7 @@ class NewCommand extends Command implements SignalableCommandInterface
 
         if (!$isProject && is_file($absoluteCoreDirectory . DIRECTORY_SEPARATOR . 'setupproject.php')) {
             $this->info('Setting up project ...');
-            $setupProcess = new Process(['php', '-f', 'setupproject.php', 'skip-frontend-build'], $coreDirectory);
+            $setupProcess = new Process(['php', '-f', 'setupproject.php', 'skip-frontend-build'], $coreDirectory, timeout: 3600);
             $setupProcess->run();
             if (!$setupProcess->isSuccessful()) {
                 $this->error('An error occurred while setting up the project.');
@@ -160,7 +160,7 @@ class NewCommand extends Command implements SignalableCommandInterface
         }
 
         if ($isProject) {
-            $composerInstall = new Process(['composer', 'install'], $directory . DIRECTORY_SEPARATOR . 'project');
+            $composerInstall = new Process(['composer', 'install'], $directory . DIRECTORY_SEPARATOR . 'project', timeout: 3600);
             $composerInstall->run();
             $composerInstalled = $composerInstall->isSuccessful();
             if (!$composerInstalled) {

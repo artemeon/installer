@@ -36,7 +36,7 @@ class Valet
             }
 
             $branch = (int) $majorVersion >= 4 ? 'v4' : 'main';
-            $cloneAgpValetDriver = new Process(['git', 'clone', '-b', $branch, 'https://github.com/artemeon/agp-valet-driver.git'], $valetDriversDirectory);
+            $cloneAgpValetDriver = new Process(['git', 'clone', '-b', $branch, 'https://github.com/artemeon/agp-valet-driver.git'], $valetDriversDirectory, timeout: 3600);
             $cloneAgpValetDriver->run();
         }
 

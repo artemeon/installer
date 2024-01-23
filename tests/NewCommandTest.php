@@ -11,7 +11,7 @@ use Symfony\Component\Console\Tester\CommandTester;
 
 class NewCommandTest extends TestCase
 {
-    public function testItCanScaffoldANewAgpApp()
+    public function testItCanScaffoldANewAgpApp(): void
     {
         $scaffoldDirectoryName = 'my-app';
         $scaffoldDirectory = __DIR__ . '/../' . $scaffoldDirectoryName;
