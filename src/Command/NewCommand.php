@@ -187,6 +187,9 @@ class NewCommand extends Command implements SignalableCommandInterface
         }
 
         $webRoot = null;
+        if ($valetAvailable) {
+            $webRoot = $defaultWebRoot;
+        }
         $envUpdated = false;
         if ($envExampleExists && !$envExists) {
             $this->section('Environment Setup');
@@ -195,9 +198,7 @@ class NewCommand extends Command implements SignalableCommandInterface
 
             $dbName = null;
             if ($this->input->isInteractive()) {
-                if ($valetAvailable) {
-                    $webRoot = $defaultWebRoot;
-                } else {
+                if (!$webRoot && !$valetAvailable) {
                     $webRoot = $this->ask('Web root', $defaultWebRoot);
                 }
 
