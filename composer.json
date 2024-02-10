@@ -19,7 +19,7 @@
         "ahinkle/packagist-latest-version": "^2.0",
         "artemeon/console": "^0.4.1",
         "guzzlehttp/guzzle": "^7.3.0",
-        "symfony/process": "^5.0|^6.0"
+        "symfony/process": "^5.0|^6.0|^7.0"
     },
     "require-dev": {
         "roave/security-advisories": "dev-latest",
