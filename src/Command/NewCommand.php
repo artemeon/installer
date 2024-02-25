@@ -269,7 +269,7 @@ class NewCommand extends Command implements SignalableCommandInterface
         return [SIGINT];
     }
 
-    public function handleSignal(int $signal): void
+    public function handleSignal(int $signal, int|false $previousExitCode = 0): int | false
     {
         if ($signal === SIGINT && $this->directory) {
             $directory = getcwd() . DIRECTORY_SEPARATOR . $this->directory;
