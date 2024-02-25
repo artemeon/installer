@@ -1,0 +1,33 @@
+name: Tests
+
+on:
+    pull_request:
+    push:
+        branches:
+            - main
+
+jobs:
+    phpunit:
+        runs-on: ${{ matrix.os }}
+        strategy:
+            fail-fast: true
+            matrix:
+                os: [ ubuntu-latest ]
+                php: [ 8.3, 8.2, 8.1 ]
+                stability: [ prefer-stable ]
+        name: PHP ${{ matrix.php }} - ${{ matrix.stability }} - ${{ matrix.os }}
+        steps:
+            - uses: actions/checkout@v3
+            - uses: shivammathur/setup-php@v2
+              with:
+                  php-version: ${{ matrix.php }}
+                  coverage: none
+            - name: Setup problem matchers
+              run: |
+                echo "::add-matcher::${{ runner.tool_cache }}/php.json"
+                echo "::add-matcher::${{ runner.tool_cache }}/phpunit.json"
+            - name: Install dependencies
+              run: |
+                composer update --${{ matrix.stability }} --prefer-dist --no-interaction
+            - name: Execute tests
+              run: vendor/bin/phpunit
