@@ -27,7 +27,7 @@ class Valet
 
         $valetDriversDirectory = $_SERVER['HOME'] . '/.config/valet/Drivers';
         $agpValetDriverDirectory = $valetDriversDirectory . '/agp-valet-driver';
-        $driverFileGlob = glob($valetDriversDirectory .'/*/src/AgpValetDriver.php');
+        $driverFileGlob = glob($valetDriversDirectory . '/*/src/AgpValetDriver.php');
 
         if (!count($driverFileGlob)) {
             $output->info('Cloning AGP Valet Driver ...');

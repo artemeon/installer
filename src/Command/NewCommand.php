@@ -61,6 +61,7 @@ class NewCommand extends Command implements SignalableCommandInterface
             $token = TokenStore::getOrAsk($this->output);
             if ($token) {
                 $this->info('Fetching available projects from GitHub ...');
+
                 try {
                     $projects = GitHub::getProjects($token);
                 } catch (JsonException) {
@@ -251,7 +252,7 @@ class NewCommand extends Command implements SignalableCommandInterface
         $time_elapsed_secs = microtime(true) - $start;
 
         if ($this->output->isVerbose()) {
-            $this->info(sprintf('Finished after %d seconds.',  round($time_elapsed_secs, 2)));
+            $this->info(sprintf('Finished after %d seconds.', round($time_elapsed_secs, 2)));
         }
 
         $url = 'https://' . $webRoot;
@@ -269,7 +270,7 @@ class NewCommand extends Command implements SignalableCommandInterface
         return [SIGINT];
     }
 
-    public function handleSignal(int $signal, int|false $previousExitCode = 0): int | false
+    public function handleSignal(int $signal, false | int $previousExitCode = 0): false | int
     {
         if ($signal === SIGINT && $this->directory) {
             $directory = getcwd() . DIRECTORY_SEPARATOR . $this->directory;
@@ -284,6 +285,8 @@ class NewCommand extends Command implements SignalableCommandInterface
                 $this->info('✨ You\'re good to go.');
             }
         }
+
+        return 0;
     }
 
     private function rrmdir(string $directory): void

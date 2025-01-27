@@ -47,7 +47,7 @@ GRAPHQL,
             return [];
         }
 
-        $data = json_decode((string)$response->getBody(), true, 512, JSON_THROW_ON_ERROR);
+        $data = json_decode((string) $response->getBody(), true, 512, JSON_THROW_ON_ERROR);
         $repositories = $data['data']['organization']['repositories']['edges'];
         $projects = [];
         foreach ($repositories as $repository) {
