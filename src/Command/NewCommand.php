@@ -192,10 +192,14 @@ class NewCommand extends Command implements SignalableCommandInterface
             $webRoot = $defaultWebRoot;
         }
         $envUpdated = false;
-        if ($envExampleExists && !$envExists) {
+        if (!$envExists) {
             $this->section('Environment Setup');
 
-            (new Process(['cp', '.env.example', '.env'], $directory))->run();
+            if ($envExampleExists) {
+                copy($directory . DIRECTORY_SEPARATOR . '.env.example', $directory . DIRECTORY_SEPARATOR . '.env');
+            } else {
+                copy($directory . DIRECTORY_SEPARATOR . 'core' . DIRECTORY_SEPARATOR . 'module_system' . DIRECTORY_SEPARATOR . '.env.example.root', $directory . DIRECTORY_SEPARATOR . '.env');
+            }
 
             $dbName = null;
             if ($this->input->isInteractive()) {
