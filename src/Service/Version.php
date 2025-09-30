@@ -4,55 +4,46 @@ declare(strict_types=1);
 
 namespace Artemeon\Installer\Service;
 
-use ahinkle\PackagistLatestVersion\PackagistLatestVersion;
 use Composer\InstalledVersions;
-use Exception;
 use JsonException;
+use RuntimeException;
 
 class Version
 {
     /**
      * @throws JsonException
      */
-    public static function getPackageName(): ?string
+    public static function fetchVersion(): ?string
     {
-        $directory = implode(DIRECTORY_SEPARATOR, [__DIR__, '..', '..', 'composer.json']);
-        $packageJson = json_decode(file_get_contents($directory), true, 512, JSON_THROW_ON_ERROR);
-
-        return $packageJson['name'] ?? null;
-    }
-
-    /**
-     * @throws JsonException
-     */
-    public static function fetchVersion(): string
-    {
-        return InstalledVersions::getPrettyVersion(self::getPackageName());
-    }
-
-    /**
-     * @throws JsonException
-     * @throws Exception
-     */
-    public static function latestVersion(): ?string
-    {
-        $packagist = new PackagistLatestVersion();
-
-        return $packagist->getLatestRelease(self::getPackageName())['version'] ?? null;
-    }
-
-    /**
-     * @throws JsonException
-     */
-    public static function checkForUpdates(): bool
-    {
-        $currentVersion = self::fetchVersion();
-        $latestVersion = self::latestVersion();
-
-        if (!preg_match('/^\d+\.\d+\.\d+$/', $currentVersion)) {
-            return false;
+        $packageName = self::getPackageName();
+        if ($packageName === null) {
+            return null;
         }
 
-        return version_compare($currentVersion, $latestVersion, '<');
+        return InstalledVersions::getPrettyVersion($packageName);
+    }
+
+    /**
+     * @throws JsonException
+     */
+    private static function getPackageName(): ?string
+    {
+        $file = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'composer.json';
+        $content = file_get_contents($file);
+        if ($content === false) {
+            return null;
+        }
+
+        $packageJson = json_decode($content, true, 512, JSON_THROW_ON_ERROR);
+        if (!is_array($packageJson)) {
+            throw new RuntimeException('Invalid composer.json.');
+        }
+
+        $name = $packageJson['name'] ?? null;
+        if (!is_string($name)) {
+            return null;
+        }
+
+        return $name;
     }
 }

@@ -6,9 +6,14 @@
         "bin/agp"
     ],
     "scripts": {
-        "phpstan": "php ./vendor/bin/phpstan --memory-limit=4G",
-        "pint": "./vendor/bin/pint --test -v",
-        "pint:fix": "./vendor/bin/pint"
+        "lint": [
+            "@rector",
+            "@pint:fix"
+        ],
+        "phpstan": "php -dxdebug.mode=off ./vendor/bin/phpstan --memory-limit=4G",
+        "pint": "php -dxdebug.mode=off ./vendor/bin/pint --test --parallel",
+        "pint:fix": "php -dxdebug.mode=off ./vendor/bin/pint --parallel",
+        "rector": "php -dxdebug.mode=off ./vendor/bin/rector process"
     },
     "authors": [
         {
@@ -22,7 +27,7 @@
         "ext-pcntl": "*",
         "composer-runtime-api": "^2.2.2",
         "ahinkle/packagist-latest-version": "^2.0",
-        "artemeon/console": "^0.5.0",
+        "artemeon/console": "^0.6.0",
         "guzzlehttp/guzzle": "^7.3.0",
         "symfony/process": "^5.0|^6.0|^7.0"
     },
@@ -30,7 +35,8 @@
         "roave/security-advisories": "dev-latest",
         "laravel/pint": "^1.20.0",
         "phpunit/phpunit": "^10.2.3|^11.0",
-        "phpstan/phpstan": "^2.1.2"
+        "phpstan/phpstan": "^2.1.2",
+        "rector/rector": "^2.1.7"
     },
     "autoload": {
         "psr-4": {
@@ -43,6 +49,7 @@
         }
     },
     "config": {
+        "process-timeout": 0,
         "sort-packages": true
     },
     "prefer-stable": true

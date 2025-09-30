@@ -5,17 +5,19 @@ declare(strict_types=1);
 namespace Artemeon\Installer\Service;
 
 use Artemeon\Console\Styles\ArtemeonStyle;
+use JsonException;
 use Symfony\Component\Process\Process;
 
 class Valet
 {
     /**
-     * @throws \JsonException
+     * @throws JsonException
      */
-    public static function setup(ArtemeonStyle $output, string $directory, string $currentDirectory, string $absoluteCoreDirectory): bool
+    public static function setup(ArtemeonStyle $output, string $directory, string $currentDirectory, string $projectDirectory): bool
     {
         $detectValet = new Process(['valet', '-V']);
         $detectValet->run();
+
         $version = trim(str_replace('Laravel Valet', '', $detectValet->getOutput()));
         [$majorVersion] = explode('.', $version);
 
@@ -25,11 +27,20 @@ class Valet
 
         $output->section(trim($detectValet->getOutput()));
 
-        $valetDriversDirectory = $_SERVER['HOME'] . '/.config/valet/Drivers';
+        $homeDirectory = $_SERVER['HOME'] ?? null;
+        if (!is_string($homeDirectory)) {
+            return false;
+        }
+
+        $valetDriversDirectory = $homeDirectory . '/.config/valet/Drivers';
         $agpValetDriverDirectory = $valetDriversDirectory . '/agp-valet-driver';
         $driverFileGlob = glob($valetDriversDirectory . '/*/src/AgpValetDriver.php');
 
-        if (!count($driverFileGlob)) {
+        if ($driverFileGlob === false) {
+            return false;
+        }
+
+        if (count($driverFileGlob) === 0) {
             $output->info('Cloning AGP Valet Driver ...');
             if ($output->isVerbose()) {
                 $output->info($agpValetDriverDirectory);
@@ -42,7 +53,12 @@ class Valet
 
         $getParkedDirectories = new Process(['valet', 'paths']);
         $getParkedDirectories->run();
+
         $parkedDirectories = json_decode(trim($getParkedDirectories->getOutput()), true, 512, JSON_THROW_ON_ERROR);
+        if (!is_array($parkedDirectories)) {
+            return false;
+        }
+
         $isParked = in_array($currentDirectory, $parkedDirectories, true);
 
         $output->info('Setting up Laravel Valet site ...');
@@ -72,13 +88,28 @@ class Valet
             }
         }
 
-        $composerJsonPath = $absoluteCoreDirectory . DIRECTORY_SEPARATOR . 'composer.json';
+        $composerJsonPath = $projectDirectory . DIRECTORY_SEPARATOR . 'composer.json';
         if (!is_file($composerJsonPath)) {
             return true;
         }
+
         $composerJsonContent = file_get_contents($composerJsonPath);
-        $composerJson = json_decode($composerJsonContent, false, 512, JSON_THROW_ON_ERROR);
-        $phpVersion = (string) $composerJson->config?->platform?->php;
+        if ($composerJsonContent === false) {
+            return false;
+        }
+
+        $composerJson = json_decode($composerJsonContent, true, 512, JSON_THROW_ON_ERROR);
+        if (
+            !is_array($composerJson) ||
+            !is_array($composerJson['config'] ?? null) ||
+            !is_array($composerJson['config']['platform'] ?? null)
+        ) {
+            return false;
+        }
+        $phpVersion = $composerJson['config']['platform']['php'] ?? null;
+        if (!is_string($phpVersion)) {
+            return false;
+        }
         $parts = explode('.', $phpVersion);
         $minifiedPhpVersion = implode('.', array_slice($parts, 0, 2));
         $prefixedPhpVersion = 'php@' . $minifiedPhpVersion;

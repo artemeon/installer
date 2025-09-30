@@ -9,14 +9,13 @@ use Symfony\Component\Process\Process;
 
 class Frontend
 {
-    public static function build(ArtemeonStyle $output, string $coreDirectory): void
+    public static function build(ArtemeonStyle $output, string $directory): void
     {
         $detectPnpm = new Process(['pnpm', '--version']);
         $detectPnpm->run();
         if ($detectPnpm->isSuccessful()) {
-            $buildFilesDirectory = $coreDirectory . DIRECTORY_SEPARATOR . '_buildfiles';
             $output->info('Installing front-end dependencies ...');
-            $pnpmInstall = new Process(['pnpm', 'install'], $buildFilesDirectory, timeout: 3600);
+            $pnpmInstall = new Process(['pnpm', 'install'], $directory, timeout: 3600);
             $pnpmInstall->run();
             if (!$pnpmInstall->isSuccessful()) {
                 $output->error('An error occurred while installing dependencies.');
@@ -27,7 +26,7 @@ class Frontend
                 }
 
                 $output->info('Building front-end assets ...');
-                $pnpmRunDev = new Process(['pnpm', 'dev'], $buildFilesDirectory, timeout: 3600);
+                $pnpmRunDev = new Process(['pnpm', 'dev'], $directory, timeout: 3600);
                 $pnpmRunDev->run();
                 if (!$pnpmRunDev->isSuccessful()) {
                     $output->error('An error occurred while building the front-end assets.');

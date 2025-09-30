@@ -12,7 +12,7 @@ use Symfony\Component\Console\Tester\CommandTester;
 /**
  * @internal
  */
-class NewCommandTest extends TestCase
+final class NewCommandTest extends TestCase
 {
     public function testItCanScaffoldANewAgpApp(): void
     {
@@ -21,9 +21,9 @@ class NewCommandTest extends TestCase
 
         if (file_exists($scaffoldDirectory)) {
             if (PHP_OS_FAMILY === 'Windows') {
-                exec("rd /s /q \"$scaffoldDirectory\"");
+                exec(sprintf('rd /s /q "%s"', $scaffoldDirectory));
             } else {
-                exec("rm -rf \"$scaffoldDirectory\"");
+                exec(sprintf('rm -rf "%s"', $scaffoldDirectory));
             }
         }
 
@@ -35,8 +35,6 @@ class NewCommandTest extends TestCase
         $statusCode = $tester->execute(['name' => $scaffoldDirectoryName], ['interactive' => false]);
 
         $this->assertSame(0, $statusCode);
-        $this->assertDirectoryExists($scaffoldDirectory . '/core');
-        $this->assertDirectoryExists($scaffoldDirectory . '/project');
         $this->assertFileExists($scaffoldDirectory . '/.env');
     }
 }

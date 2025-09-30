@@ -13,7 +13,7 @@ use Symfony\Component\Console\Application;
         $this->autoload();
         $this->fetchVersion();
 
-        $app = new Application('AGP Installer', Version::fetchVersion());
+        $app = new Application('AGP Installer', Version::fetchVersion() ?? 'UNKNOWN');
         $app->add(new NewCommand());
         $app->run();
     }
@@ -29,7 +29,7 @@ use Symfony\Component\Console\Application;
                 [
                     __DIR__ . '/../../../autoload.php',
                     __DIR__ . '/../../vendor/autoload.php',
-                    __DIR__ . '/../vendor/autoload.php'
+                    __DIR__ . '/../vendor/autoload.php',
                 ] as $file
             ) {
                 if (file_exists($file)) {
